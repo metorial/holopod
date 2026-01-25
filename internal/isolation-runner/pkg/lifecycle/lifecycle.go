@@ -49,7 +49,7 @@ func SetupContainer(ctx context.Context, input *config.ContainerInput, cfg *conf
 	}
 
 	// SECURITY: Log display name only
-	jsonmsg.Info(fmt.Sprintf("Image: %s", input.GetImageDisplayName()))
+	// jsonmsg.Info(fmt.Sprintf("Image: %s", input.GetImageDisplayName()))
 
 	cmd := input.GetContainerCommand()
 	args := input.GetContainerArgs()
