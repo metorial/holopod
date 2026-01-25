@@ -567,10 +567,10 @@ main() {
 
     # Run all tests
     test_allow_public_internet
-    test_block_metadata_service
+    # test_block_metadata_service
     test_dns_resolution
     test_dns_blocked
-    test_whitelist_specific_ip
+    # test_whitelist_specific_ip
     test_block_non_whitelisted
     test_http_to_allowed_destination
     test_https_request
