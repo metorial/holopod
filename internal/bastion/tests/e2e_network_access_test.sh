@@ -537,7 +537,7 @@ main() {
 
     # Run all tests
     test_allow_public_internet
-    # test_block_metadata_service
+    test_block_metadata_service
     test_dns_resolution
     test_dns_blocked
     test_whitelist_specific_ip
@@ -547,7 +547,7 @@ main() {
     test_blacklist_cidr
     test_port_specific_whitelist
     test_localhost_always_blocked
-    # test_concurrent_containers
+    test_concurrent_containers
 
     echo ""
     echo "========================================="
