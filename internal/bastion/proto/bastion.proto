@@ -1,0 +1,158 @@
+syntax = "proto3";
+
+package bastion;
+
+option go_package = "github.com/metorial/fleet/holopod/internal/bastion/proto";
+
+service BastionService {
+  rpc SetupChain(SetupChainRequest) returns (SetupChainResponse);
+  rpc ApplyRules(ApplyRulesRequest) returns (ApplyRulesResponse);
+  rpc CleanupChain(CleanupChainRequest) returns (CleanupChainResponse);
+  rpc Health(HealthRequest) returns (HealthResponse);
+
+  // Network pool management
+  rpc AcquireNetwork(AcquireNetworkRequest) returns (AcquireNetworkResponse);
+  rpc ReleaseNetwork(ReleaseNetworkRequest) returns (ReleaseNetworkResponse);
+  rpc GetNetworkStats(NetworkStatsRequest) returns (NetworkStatsResponse);
+}
+
+message SetupChainRequest {
+  string chain_name = 1;
+  string container_ip = 2;
+  string container_id = 3;
+}
+
+message SetupChainResponse {
+  bool success = 1;
+  optional string error = 2;
+}
+
+message ApplyRulesRequest {
+  string chain_name = 1;
+  NetworkPolicy policy = 2;
+  string container_id = 3;
+}
+
+message ApplyRulesResponse {
+  bool success = 1;
+  optional string error = 2;
+  int32 rules_applied = 3; 
+}
+
+message CleanupChainRequest {
+  string chain_name = 1;
+  string container_id = 2;
+}
+
+message CleanupChainResponse {
+  bool success = 1;
+  optional string error = 2;
+}
+
+message HealthRequest {}
+
+message HealthResponse {
+  bool healthy = 1;
+  string version = 2;
+  bool iptables_available = 3;
+}
+
+message NetworkPolicy {
+  // Policy mode: "allow" (allowlist) or "deny" (denylist)
+  string policy = 1;
+
+  // Block access to metadata services (169.254.169.254)
+  bool block_metadata = 2;
+
+  // Allow DNS queries
+  bool allow_dns = 3;
+
+  // Custom DNS servers (validated IPs)
+  repeated string dns_servers = 4;
+
+  // Whitelist rules (when policy = "deny")
+  repeated NetworkRule whitelist = 5;
+
+  // Blacklist rules (when policy = "allow")
+  repeated NetworkRule blacklist = 6;
+}
+
+message NetworkRule {
+  string cidr = 1;
+  optional string description = 2;
+  repeated uint32 ports = 3;
+}
+
+// Network pool management messages
+
+message NetworkConfig {
+  // Subnet requirements (e.g., "172.20.0.0/16" or empty for any)
+  optional string subnet_range = 1;
+
+  // Minimum number of available IPs needed
+  optional uint32 min_ips = 2;
+
+  // Network driver (default: "bridge")
+  optional string driver = 3;
+
+  // Config hash for matching similar configs
+  string config_hash = 4;
+}
+
+message AcquireNetworkRequest {
+  string container_id = 1;
+  NetworkConfig network_config = 2;
+
+  // How long to hold the network (seconds, default: 3600)
+  optional uint32 lease_duration_secs = 3;
+}
+
+message AcquireNetworkResponse {
+  bool success = 1;
+  optional string error = 2;
+
+  // Network details if successful
+  optional string network_name = 3;
+  optional string network_id = 4;
+  optional string subnet = 5;
+
+  // Whether this is a reused network (vs newly created)
+  bool reused = 6;
+}
+
+message ReleaseNetworkRequest {
+  string container_id = 1;
+  string network_name = 2;
+
+  // Force immediate cleanup (default: false, uses TTL)
+  optional bool force_cleanup = 3;
+}
+
+message ReleaseNetworkResponse {
+  bool success = 1;
+  optional string error = 2;
+
+  // Whether network was cleaned up or returned to pool
+  bool cleaned_up = 3;
+}
+
+message NetworkStatsRequest {}
+
+message NetworkStatsResponse {
+  uint32 total_networks = 1;
+  uint32 active_networks = 2;
+  uint32 pooled_networks = 3;
+  uint32 pending_cleanup = 4;
+
+  // Pool utilization (0.0 - 1.0)
+  float utilization = 5;
+
+  // Network pool health
+  bool healthy = 6;
+
+  // Subnet utilization (0.0 - 1.0)
+  float subnet_utilization = 7;
+
+  // Maximum available subnets
+  uint32 max_subnets = 8;
+}
