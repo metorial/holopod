@@ -1,0 +1,99 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Container Manager UI</title>
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+    <div class="container">
+        <header>
+            <h1>🐳 Container Manager</h1>
+            <div class="health-status" id="health">
+                <span class="status-dot">●</span>
+                <span id="health-text">Checking...</span>
+            </div>
+        </header>
+
+        <div class="main-content">
+            <!-- Left Panel: Create Container -->
+            <div class="panel create-panel">
+                <h2>Create Container</h2>
+                <form id="create-form">
+                    <div class="form-group">
+                        <label for="image">Image*</label>
+                        <input type="text" id="image" placeholder="ubuntu:latest" required>
+                    </div>
+
+                    <div class="form-group">
+                        <label for="command">Command (optional)</label>
+                        <input type="text" id="command" placeholder="bash -c 'echo Hello World'">
+                        <small>Separate with spaces. For complex commands, use quotes.</small>
+                    </div>
+
+                    <div class="form-group">
+                        <label for="env">Environment Variables (optional)</label>
+                        <textarea id="env" rows="3" placeholder="KEY1=value1&#10;KEY2=value2"></textarea>
+                    </div>
+
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label for="timeout">Timeout (seconds)</label>
+                            <input type="number" id="timeout" value="300" min="0">
+                        </div>
+
+                        <div class="form-group checkbox-group">
+                            <label>
+                                <input type="checkbox" id="cleanup" checked>
+                                Auto-cleanup
+                            </label>
+                        </div>
+                    </div>
+
+                    <button type="submit" class="btn btn-primary">Create Container</button>
+                </form>
+
+                <div id="create-result" class="result"></div>
+            </div>
+
+            <!-- Right Panel: Container List -->
+            <div class="panel list-panel">
+                <div class="panel-header">
+                    <h2>Containers</h2>
+                    <button class="btn btn-secondary" onclick="refreshContainers()">🔄 Refresh</button>
+                </div>
+
+                <div class="filter-tabs">
+                    <button class="tab active" data-filter="all">All</button>
+                    <button class="tab" data-filter="running">Running</button>
+                    <button class="tab" data-filter="exited">Exited</button>
+                </div>
+
+                <div id="container-list" class="container-list">
+                    <div class="loading">Loading containers...</div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Console Modal -->
+        <div id="console-modal" class="modal">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h3>Container Console: <span id="console-container-id"></span></h3>
+                    <button class="close-btn" onclick="closeConsole()">&times;</button>
+                </div>
+                <div class="console-body">
+                    <div id="console-output" class="console-output"></div>
+                    <div class="console-input-area">
+                        <input type="text" id="console-input" placeholder="Type command and press Enter..." />
+                        <button onclick="sendCommand()" class="btn btn-secondary">Send</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script src="app.js"></script>
+</body>
+</html>
