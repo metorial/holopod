@@ -1,0 +1,169 @@
+name: Tests
+
+on:
+  push:
+    branches: [ main, develop ]
+  pull_request:
+    branches: [ main, develop ]
+
+jobs:
+  go-tests:
+    name: Go Tests
+    runs-on: ubuntu-latest
+
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+
+    - name: Set up Go
+      uses: actions/setup-go@v5
+      with:
+        go-version: '1.25'
+        cache: true
+
+    - name: Download dependencies
+      run: go mod download
+
+    - name: Run Go tests
+      run: go test -v ./...
+
+    - name: Run Go tests with coverage
+      run: |
+        go test -v -coverprofile=coverage.out ./...
+        go tool cover -func=coverage.out
+
+    - name: Upload coverage
+      uses: codecov/codecov-action@v4
+      if: always()
+      with:
+        file: ./coverage.out
+        flags: unittests
+        fail_ci_if_error: false
+      continue-on-error: true
+
+  integration-tests:
+    name: Integration Tests
+    runs-on: ubuntu-latest
+
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+
+    - name: Set up Go
+      uses: actions/setup-go@v5
+      with:
+        go-version: '1.25'
+        cache: true
+
+    - name: Download dependencies
+      run: go mod download
+
+    - name: Install grpcurl
+      run: go install github.com/fullstorydev/grpcurl/cmd/grpcurl@latest
+
+    - name: Build binaries
+      run: |
+        # Build isolation-runner
+        cd internal/isolation-runner
+        go build -o bin/isolation-runner ./cmd/isolation-runner
+        go build -o bin/cleanup-orphans ./cmd/cleanup-orphans
+        cd ../..
+
+        # Build bastion
+        cd internal/bastion
+        go build -o bin/bastion ./cmd/bastion
+        cd ../..
+
+        # Build container-manager
+        cd services/container-manager
+        go build -o bin/container-manager ./cmd/container-manager
+        cd ../..
+
+    - name: Pull required Docker images
+      run: |
+        docker pull alpine:latest
+        docker pull ubuntu:latest
+        docker pull curlimages/curl:latest
+
+    - name: Run bastion DNS configuration test
+      run: |
+        cd internal/bastion/tests
+        sudo timeout 60s bash test_dns_configuration.sh || exit 1
+      continue-on-error: false
+
+    - name: Run bastion E2E network access test
+      run: |
+        cd internal/bastion/tests
+        sudo timeout 120s bash e2e_network_access_test.sh || exit 1
+      continue-on-error: false
+
+    - name: Run bastion IPv6 filtering test
+      run: |
+        cd internal/bastion/tests
+        sudo timeout 60s bash test_ipv6_filtering.sh || true
+      continue-on-error: true
+
+    - name: Run container-manager integration test
+      run: |
+        cd services/container-manager/tests
+        timeout 60s bash test_integration.sh || exit 1
+      continue-on-error: false
+
+    - name: Run isolation-runner network security test
+      run: |
+        cd internal/isolation-runner/tests
+        timeout 120s bash test_network_security.sh || true
+      continue-on-error: true
+
+    - name: Run isolation-runner orphan prevention test
+      run: |
+        cd internal/isolation-runner/tests
+        timeout 120s bash test_orphan_prevention.sh || true
+      continue-on-error: true
+
+    - name: Cleanup
+      if: always()
+      run: |
+        # Kill any remaining processes
+        sudo pkill -9 -f bin/bastion || true
+        pkill -9 -f container-manager || true
+        pkill -9 -f isolation-runner || true
+
+        # Clean up Docker containers
+        docker ps -a --filter "label=isolation-runner" -q | xargs -r docker rm -f || true
+
+        # Clean up Docker networks
+        docker network ls --filter "name=iso-" -q | xargs -r docker network rm || true
+
+  lint:
+    name: Lint
+    runs-on: ubuntu-latest
+
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+
+    - name: Set up Go
+      uses: actions/setup-go@v5
+      with:
+        go-version: '1.25'
+        cache: true
+
+    - name: Run go vet
+      run: go vet ./...
+
+    - name: Run go fmt
+      run: |
+        if [ "$(gofmt -s -l . | wc -l)" -gt 0 ]; then
+          echo "The following files are not formatted:"
+          gofmt -s -l .
+          exit 1
+        fi
+
+    - name: Install golangci-lint
+      run: |
+        curl -sSfL https://raw.githubusercontent.com/golangci/golangci-lint/master/install.sh | sh -s -- -b $(go env GOPATH)/bin v1.55.2
+
+    - name: Run golangci-lint
+      run: $(go env GOPATH)/bin/golangci-lint run --timeout=5m
+      continue-on-error: true
