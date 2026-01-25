@@ -1,0 +1,327 @@
+syntax = "proto3";
+
+package container_manager;
+
+option go_package = "github.com/metorial/fleet/holopod/services/container-manager/proto";
+
+// Container Manager Service
+// Manages isolation-runner subprocesses for container lifecycle
+service ContainerManager {
+  // Unified bidirectional stream for container lifecycle
+  // First message MUST be RunRequest with create field set
+  // Server sends stdout/stderr/messages/exit events
+  // Client can send stdin
+  // Client MUST send heartbeat every 30 seconds or container will be terminated
+  // Connection close/interrupt automatically terminates container
+  rpc Run(stream RunRequest) returns (stream RunResponse);
+
+  // List all containers (running and recent)
+  rpc ListContainers(ListContainersRequest) returns (ListContainersResponse);
+
+  // Get status of a specific container
+  rpc GetContainerStatus(GetContainerStatusRequest) returns (GetContainerStatusResponse);
+
+  // Health check
+  rpc Health(HealthRequest) returns (HealthResponse);
+
+  // Get node resources (CPU, memory, disk)
+  rpc GetNodeResources(GetNodeResourcesRequest) returns (GetNodeResourcesResponse);
+
+  // Get available Docker images on this node
+  rpc GetAvailableImages(GetAvailableImagesRequest) returns (GetAvailableImagesResponse);
+}
+
+// ===== Run (Unified Container Lifecycle) =====
+
+message RunRequest {
+  oneof request {
+    // MUST be sent as first message - creates and starts container
+    CreateContainer create = 1;
+
+    // Send stdin data to container
+    bytes stdin = 2;
+
+    // Close stdin stream
+    bool close_stdin = 3;
+
+    // Terminate container (optional - connection close also terminates)
+    TerminateContainer terminate = 4;
+
+    // Heartbeat - MUST be sent at least every 30 seconds or container will be terminated
+    bool heartbeat = 5;
+  }
+}
+
+message CreateContainer {
+  // Unique ID for this container (if not provided, one will be generated)
+  optional string container_id = 1;
+
+  // Container configuration
+  ContainerConfig config = 2;
+}
+
+message TerminateContainer {
+  // Force kill (SIGKILL) instead of graceful termination (SIGTERM)
+  bool force = 1;
+
+  // Timeout for graceful termination before force kill (seconds)
+  uint32 timeout_secs = 2;
+}
+
+message RunResponse {
+  // Container ID for this stream
+  string container_id = 1;
+
+  oneof event {
+    // Container was created successfully
+    ContainerCreated created = 2;
+
+    // Stdout data from container
+    bytes stdout = 3;
+
+    // Stderr data from container
+    bytes stderr = 4;
+
+    // Container exited
+    ContainerExit exit = 5;
+
+    // Error occurred
+    string error = 6;
+
+    // Raw JSON message from isolation-runner (info, debug, warning, etc.)
+    string message = 7;
+  }
+}
+
+message ContainerCreated {
+  string container_id = 1;
+  ContainerState state = 2;
+}
+
+message ContainerExit {
+  int32 exit_code = 1;
+  string timestamp = 2;
+}
+
+// ===== Container Configuration =====
+
+message ContainerConfig {
+  // Docker image specification with optional authentication
+  ImageSpec image_spec = 1;
+
+  // Command to execute in container (overrides image's default ENTRYPOINT)
+  // If not specified, uses the image's default ENTRYPOINT
+  repeated string command = 2;
+
+  // Working directory
+  optional string workdir = 3;
+
+  // Environment variables
+  map<string, string> env = 4;
+
+  // Resource limits
+  optional ResourceLimits resources = 5;
+
+  // Network configuration
+  optional NetworkConfig network = 6;
+
+  // Timeout in seconds (0 = no timeout)
+  optional uint32 timeout_secs = 7;
+
+  // Whether to cleanup container after exit
+  optional bool cleanup = 8;
+
+  // Arguments to pass to the command (overrides image's default CMD)
+  // If command is not specified, these are passed to the image's default ENTRYPOINT
+  // If command is specified, these are appended as arguments to that command
+  repeated string args = 9;
+}
+
+// Image specification with registry and authentication
+message ImageSpec {
+  // Registry hostname (defaults to "registry-1.docker.io" if not provided)
+  // Examples: "gcr.io", "ghcr.io", "my-registry.local:5000"
+  optional string registry = 1;
+
+  // Image name with tag or digest (without registry prefix)
+  // Examples: "library/nginx:latest", "myorg/app@sha256:abc123..."
+  string image = 2;
+
+  // Optional authentication credentials
+  oneof auth {
+    BasicAuth basic_auth = 3;
+  }
+}
+
+// Basic authentication for private registries
+message BasicAuth {
+  string username = 1;
+  string password = 2;
+}
+
+message ResourceLimits {
+  // CPU limit (e.g., "1.0" for 1 CPU)
+  optional string cpu_limit = 1;
+
+  // Memory limit (e.g., "512m", "1g")
+  optional string memory_limit = 2;
+}
+
+message NetworkConfig {
+  // Network policy rules
+  repeated NetworkRule rules = 1;
+
+  // Default policy (allow/deny)
+  optional string default_policy = 2;
+
+  // Custom DNS servers
+  repeated string dns_servers = 3;
+}
+
+message NetworkRule {
+  // Rule type (allow/deny)
+  string action = 1;
+
+  // Protocol (tcp/udp/icmp)
+  optional string protocol = 2;
+
+  // Destination CIDR
+  optional string destination = 3;
+
+  // Port range start (inclusive)
+  optional uint32 port_range_start = 4;
+
+  // Port range end (inclusive)
+  optional uint32 port_range_end = 5;
+}
+
+// ===== ListContainers =====
+
+message ListContainersRequest {
+  // Filter by state (running, exited, all)
+  optional string filter = 1;
+}
+
+message ListContainersResponse {
+  repeated ContainerInfo containers = 1;
+}
+
+message ContainerInfo {
+  string container_id = 1;
+  string image = 2;
+  ContainerState state = 3;
+  string created_at = 4;
+  optional string finished_at = 5;
+  optional int32 exit_code = 6;
+  repeated string command = 7;
+}
+
+enum ContainerState {
+  CREATED = 0;
+  RUNNING = 1;
+  EXITED = 2;
+  FAILED = 3;
+  TERMINATED = 4;
+}
+
+// ===== GetContainerStatus =====
+
+message GetContainerStatusRequest {
+  string container_id = 1;
+}
+
+message GetContainerStatusResponse {
+  bool success = 1;
+  optional string error = 2;
+  optional ContainerStatus status = 3;
+}
+
+message ContainerStatus {
+  string container_id = 1;
+  ContainerState state = 2;
+  string created_at = 3;
+  optional string started_at = 4;
+  optional string finished_at = 5;
+  optional int32 exit_code = 6;
+  optional int32 pid = 7;
+  ContainerConfig config = 8;
+
+  // I/O statistics
+  IOStats io_stats = 9;
+
+  // Unix timestamp when container should be cleaned up (if cleanup enabled)
+  optional int64 cleanup_after = 10;
+}
+
+message IOStats {
+  uint64 stdin_bytes = 1;
+  uint64 stdout_bytes = 2;
+  uint64 stderr_bytes = 3;
+}
+
+// ===== Health =====
+
+message HealthRequest {}
+
+message HealthResponse {
+  bool healthy = 1;
+  string version = 2;
+  uint32 running_containers = 3;
+  uint32 total_containers = 4;
+  optional string isolation_runner_path = 5;
+  repeated string health_issues = 6;
+}
+
+// ===== GetNodeResources =====
+
+message GetNodeResourcesRequest {}
+
+message GetNodeResourcesResponse {
+  bool success = 1;
+  optional string error = 2;
+  optional NodeResources resources = 3;
+}
+
+message NodeResources {
+  // CPU
+  uint32 cpu_cores = 1;
+  float cpu_usage_percent = 2;
+
+  // Memory (bytes)
+  uint64 memory_total_bytes = 3;
+  uint64 memory_available_bytes = 4;
+  uint64 memory_used_bytes = 5;
+  float memory_usage_percent = 6;
+
+  // Disk (bytes)
+  uint64 disk_total_bytes = 7;
+  uint64 disk_available_bytes = 8;
+  uint64 disk_used_bytes = 9;
+  float disk_usage_percent = 10;
+
+  // Container stats
+  uint32 running_containers = 11;
+  uint32 total_containers = 12;
+
+  // Load averages
+  float load_1min = 13;
+  float load_5min = 14;
+  float load_15min = 15;
+}
+
+// ===== GetAvailableImages =====
+
+message GetAvailableImagesRequest {}
+
+message GetAvailableImagesResponse {
+  bool success = 1;
+  optional string error = 2;
+  repeated ImageInfo images = 3;
+}
+
+message ImageInfo {
+  string id = 1;
+  repeated string repo_tags = 2;
+  uint64 size_bytes = 3;
+  string created = 4;
+}
