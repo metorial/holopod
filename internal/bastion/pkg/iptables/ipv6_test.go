@@ -3,8 +3,15 @@ package iptables
 import (
 	"context"
 	"net"
+	"os"
 	"testing"
 )
+
+func requireRoot(t *testing.T) {
+	if os.Geteuid() != 0 {
+		t.Skip("Skipping test: requires root privileges")
+	}
+}
 
 func TestDetectIPVersion(t *testing.T) {
 	tests := []struct {
@@ -78,6 +85,7 @@ func TestSetupChainIPv4(t *testing.T) {
 	if testing.Short() {
 		t.Skip("Skipping integration test in short mode")
 	}
+	requireRoot(t)
 
 	ctx := context.Background()
 	chainName := "TEST-IPv4-CHAIN"
@@ -107,6 +115,7 @@ func TestSetupChainIPv6(t *testing.T) {
 	if testing.Short() {
 		t.Skip("Skipping integration test in short mode")
 	}
+	requireRoot(t)
 
 	ctx := context.Background()
 	chainName := "TEST-IPv6-CHAIN"
@@ -136,6 +145,7 @@ func TestIPv4andIPv6CoexistenceIntegration(t *testing.T) {
 	if testing.Short() {
 		t.Skip("Skipping integration test in short mode")
 	}
+	requireRoot(t)
 
 	ctx := context.Background()
 
@@ -173,6 +183,7 @@ func TestCleanupChainBothVersions(t *testing.T) {
 	if testing.Short() {
 		t.Skip("Skipping integration test in short mode")
 	}
+	requireRoot(t)
 
 	ctx := context.Background()
 	chainName := "TEST-CLEANUP-DUAL"
