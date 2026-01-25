@@ -493,39 +493,9 @@ test_concurrent_containers() {
     local output1="$TEMP_DIR/output_concurrent1.txt"
     local output2="$TEMP_DIR/output_concurrent2.txt"
 
-    cat > "$config1" << 'EOF'
-{
-  "version": "1.0",
-  "image": "alpine:latest",
-  "command": ["ping", "-c", "3", "-W", "2", "1.1.1.1"],
-  "bastion_address": "localhost:50054",
-  "network": {
-    "whitelist": [{"cidr": "1.1.1.1/32"}],
-    "default_policy": "deny",
-    "block_metadata": true,
-    "allow_dns": false
-  },
-  "container": {"runtime": "runc"},
-  "execution": {"timeout_seconds": 15, "auto_cleanup": true}
-}
-EOF
+    echo '{"type":"config","config":{"image_spec":{"image":"alpine:latest"},"command":["ping","-c","3","-W","2","1.1.1.1"],"config":{"version":"1.0","network":{"whitelist":[{"cidr":"1.1.1.1/32"}],"blacklist":[],"default_policy":"deny","block_metadata":true,"allow_dns":false,"dns_servers":[]},"container":{"runtime":"runc"},"execution":{"timeout_seconds":15,"auto_cleanup":true,"attach_stdout":true,"attach_stderr":true}}}}' > "$config1"
 
-    cat > "$config2" << 'EOF'
-{
-  "version": "1.0",
-  "image": "alpine:latest",
-  "command": ["ping", "-c", "3", "-W", "2", "8.8.8.8"],
-  "bastion_address": "localhost:50054",
-  "network": {
-    "whitelist": [{"cidr": "8.8.8.8/32"}],
-    "default_policy": "deny",
-    "block_metadata": true,
-    "allow_dns": false
-  },
-  "container": {"runtime": "runc"},
-  "execution": {"timeout_seconds": 15, "auto_cleanup": true}
-}
-EOF
+    echo '{"type":"config","config":{"image_spec":{"image":"alpine:latest"},"command":["ping","-c","3","-W","2","8.8.8.8"],"config":{"version":"1.0","network":{"whitelist":[{"cidr":"8.8.8.8/32"}],"blacklist":[],"default_policy":"deny","block_metadata":true,"allow_dns":false,"dns_servers":[]},"container":{"runtime":"runc"},"execution":{"timeout_seconds":15,"auto_cleanup":true,"attach_stdout":true,"attach_stderr":true}}}}' > "$config2"
 
     # Run both containers concurrently
     run_container "$config1" "alpine:latest" "ping 1.1.1.1" "$output1" 20 &
@@ -533,11 +503,11 @@ EOF
     run_container "$config2" "alpine:latest" "ping 8.8.8.8" "$output2" 20 &
     PID2=$!
 
-    # Wait for both
-    wait $PID1
-    RESULT1=$?
-    wait $PID2
-    RESULT2=$?
+    # Wait for both (use || true to prevent set -e from exiting on failure)
+    wait $PID1 || RESULT1=$?
+    RESULT1=${RESULT1:-0}
+    wait $PID2 || RESULT2=$?
+    RESULT2=${RESULT2:-0}
 
     if [ $RESULT1 -eq 0 ] && [ $RESULT2 -eq 0 ]; then
         if grep -qi "3 packets transmitted, 3.*received\|3 received" "$output1" && \
@@ -567,10 +537,10 @@ main() {
 
     # Run all tests
     test_allow_public_internet
-    # test_block_metadata_service
+    test_block_metadata_service
     test_dns_resolution
     test_dns_blocked
-    # test_whitelist_specific_ip
+    test_whitelist_specific_ip
     test_block_non_whitelisted
     test_http_to_allowed_destination
     test_https_request
