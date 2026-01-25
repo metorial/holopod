@@ -109,7 +109,7 @@ EOF
 
 echo '{"type":"config","config":{"image_spec":{"image":"alpine:latest"},"command":["cat","/etc/resolv.conf"],"config":{"version":"1.0","network":{"whitelist":[],"blacklist":[],"default_policy":"allow","block_metadata":true,"allow_dns":true,"dns_servers":["8.8.8.8","1.1.1.1"]},"container":{"runtime":"runc"},"execution":{"timeout_seconds":10,"auto_cleanup":true,"attach_stdout":true,"attach_stderr":true}}}}' | \
 BASTION_ADDRESS="localhost:50054" \
-timeout 15s "$ISOLATION_RUNNER_BIN" > "$TEMP_DIR/test1_output.txt" 2>&1
+timeout 15s "$ISOLATION_RUNNER_BIN" > "$TEMP_DIR/test1_output.txt" 2>&1 || true
 
 if grep -q "8.8.8.8" "$TEMP_DIR/test1_output.txt" && grep -q "1.1.1.1" "$TEMP_DIR/test1_output.txt"; then
     pass "Custom DNS servers configured correctly"
@@ -127,7 +127,7 @@ EOF
 
 echo '{"type":"config","config":{"image_spec":{"image":"alpine:latest"},"command":["cat","/etc/resolv.conf"],"config":{"version":"1.0","network":{"whitelist":[],"blacklist":[],"default_policy":"allow","block_metadata":true,"allow_dns":true,"dns_servers":[]},"container":{"runtime":"runc"},"execution":{"timeout_seconds":10,"auto_cleanup":true,"attach_stdout":true,"attach_stderr":true}}}}' | \
 BASTION_ADDRESS="localhost:50054" \
-timeout 15s "$ISOLATION_RUNNER_BIN" > "$TEMP_DIR/test2_output.txt" 2>&1
+timeout 15s "$ISOLATION_RUNNER_BIN" > "$TEMP_DIR/test2_output.txt" 2>&1 || true
 
 # When no DNS servers are specified, Docker uses 127.0.0.11 (embedded DNS)
 if grep -q "nameserver" "$TEMP_DIR/test2_output.txt"; then
@@ -146,7 +146,7 @@ EOF
 
 echo '{"type":"config","config":{"image_spec":{"image":"alpine:latest"},"command":["nslookup","google.com"],"config":{"version":"1.0","network":{"whitelist":[{"cidr":"0.0.0.0/0"}],"blacklist":[],"default_policy":"allow","block_metadata":true,"allow_dns":true,"dns_servers":["8.8.8.8"]},"container":{"runtime":"runc"},"execution":{"timeout_seconds":10,"auto_cleanup":true,"attach_stdout":true,"attach_stderr":true}}}}' | \
 BASTION_ADDRESS="localhost:50054" \
-timeout 15s "$ISOLATION_RUNNER_BIN" > "$TEMP_DIR/test3_output.txt" 2>&1
+timeout 15s "$ISOLATION_RUNNER_BIN" > "$TEMP_DIR/test3_output.txt" 2>&1 || true
 
 if grep -qi "address.*[0-9]\+\.[0-9]\+\.[0-9]\+\.[0-9]\+" "$TEMP_DIR/test3_output.txt"; then
     pass "DNS resolution successful with custom servers"

@@ -147,7 +147,7 @@ EOF
 # Link-local addresses should be blocked
 echo '{"type":"config","config":{"image_spec":{"image":"alpine:latest"},"command":["sh","-c","echo test"],"config":{"version":"1.0","network":{"whitelist":[],"blacklist":[{"cidr":"fe80::/10"}],"default_policy":"allow","block_metadata":true,"allow_dns":false,"dns_servers":[]},"container":{"runtime":"runc"},"execution":{"timeout_seconds":5,"auto_cleanup":true,"attach_stdout":true,"attach_stderr":true}}}}' | \
 BASTION_ADDRESS="localhost:50054" \
-timeout 10s "$ISOLATION_RUNNER_BIN" > "$TEMP_DIR/test2_output.txt" 2>&1
+timeout 10s "$ISOLATION_RUNNER_BIN" > "$TEMP_DIR/test2_output.txt" 2>&1 || true
 
 if grep -q "exit_code.*0" "$TEMP_DIR/test2_output.txt"; then
     pass "IPv6 link-local blacklist configured"
@@ -165,7 +165,7 @@ EOF
 # Should accept configuration with IPv6 whitelist
 echo '{"type":"config","config":{"image_spec":{"image":"alpine:latest"},"command":["sh","-c","echo test"],"config":{"version":"1.0","network":{"whitelist":[{"cidr":"2001:db8::1/128","description":"Test IPv6"}],"blacklist":[],"default_policy":"deny","block_metadata":true,"allow_dns":false,"dns_servers":[]},"container":{"runtime":"runc"},"execution":{"timeout_seconds":5,"auto_cleanup":true,"attach_stdout":true,"attach_stderr":true}}}}' | \
 BASTION_ADDRESS="localhost:50054" \
-timeout 10s "$ISOLATION_RUNNER_BIN" > "$TEMP_DIR/test3_output.txt" 2>&1
+timeout 10s "$ISOLATION_RUNNER_BIN" > "$TEMP_DIR/test3_output.txt" 2>&1 || true
 
 if grep -q "exit_code.*0" "$TEMP_DIR/test3_output.txt"; then
     pass "IPv6 whitelist configured successfully"
@@ -183,7 +183,7 @@ EOF
 # Should accept both IPv4 and IPv6 rules
 echo '{"type":"config","config":{"image_spec":{"image":"alpine:latest"},"command":["sh","-c","echo test"],"config":{"version":"1.0","network":{"whitelist":[{"cidr":"8.8.8.8/32","description":"Google DNS IPv4"},{"cidr":"2001:4860:4860::8888/128","description":"Google DNS IPv6"}],"blacklist":[],"default_policy":"deny","block_metadata":true,"allow_dns":true,"dns_servers":["8.8.8.8","2001:4860:4860::8888"]},"container":{"runtime":"runc"},"execution":{"timeout_seconds":5,"auto_cleanup":true,"attach_stdout":true,"attach_stderr":true}}}}' | \
 BASTION_ADDRESS="localhost:50054" \
-timeout 10s "$ISOLATION_RUNNER_BIN" > "$TEMP_DIR/test4_output.txt" 2>&1
+timeout 10s "$ISOLATION_RUNNER_BIN" > "$TEMP_DIR/test4_output.txt" 2>&1 || true
 
 if grep -q "exit_code.*0" "$TEMP_DIR/test4_output.txt"; then
     pass "Mixed IPv4/IPv6 rules configured successfully"
@@ -201,7 +201,7 @@ EOF
 # Should accept IPv6 DNS servers
 echo '{"type":"config","config":{"image_spec":{"image":"alpine:latest"},"command":["cat","/etc/resolv.conf"],"config":{"version":"1.0","network":{"whitelist":[],"blacklist":[],"default_policy":"allow","block_metadata":true,"allow_dns":true,"dns_servers":["2001:4860:4860::8888"]},"container":{"runtime":"runc"},"execution":{"timeout_seconds":5,"auto_cleanup":true,"attach_stdout":true,"attach_stderr":true}}}}' | \
 BASTION_ADDRESS="localhost:50054" \
-timeout 10s "$ISOLATION_RUNNER_BIN" > "$TEMP_DIR/test5_output.txt" 2>&1
+timeout 10s "$ISOLATION_RUNNER_BIN" > "$TEMP_DIR/test5_output.txt" 2>&1 || true
 
 if grep -q "2001:4860:4860::8888" "$TEMP_DIR/test5_output.txt" || grep -q "exit_code.*0" "$TEMP_DIR/test5_output.txt"; then
     pass "IPv6 DNS server configured"
