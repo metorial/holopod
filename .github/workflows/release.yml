@@ -47,9 +47,12 @@ jobs:
             go build -trimpath -ldflags "-s -w -X main.version=${version}" \
             -o "${dist_dir}/isolation-runner" ./internal/isolation-runner/cmd/isolation-runner
 
-          GOOS=${{ matrix.os }} GOARCH=${{ matrix.arch }} \
-            go build -trimpath -ldflags "-s -w -X main.version=${version}" \
-            -o "${dist_dir}/container-manager" ./services/container-manager/cmd/container-manager
+          (
+            cd services/container-manager
+            GOOS=${{ matrix.os }} GOARCH=${{ matrix.arch }} \
+              go build -trimpath -ldflags "-s -w -X main.version=${version}" \
+              -o "../../${dist_dir}/container-manager" ./cmd/container-manager
+          )
 
           GOOS=${{ matrix.os }} GOARCH=${{ matrix.arch }} \
             go build -trimpath -ldflags "-s -w -X main.version=${version}" \
