@@ -163,8 +163,14 @@ func (c *Container) buildConfig() map[string]any {
 	}
 
 	defaultPolicy := "deny"
+	allowDNS := false
+	dnsServers := []string{}
 	if c.Config.Network != nil && c.Config.Network.DefaultPolicy != nil {
 		defaultPolicy = *c.Config.Network.DefaultPolicy
+	}
+	if c.Config.Network != nil && len(c.Config.Network.DnsServers) > 0 {
+		allowDNS = true
+		dnsServers = c.Config.Network.DnsServers
 	}
 
 	// Build container config, only include resource limits if they're set
@@ -200,6 +206,8 @@ func (c *Container) buildConfig() map[string]any {
 				"network": map[string]any{
 					"default_policy":       defaultPolicy,
 					"block_metadata":       true,
+					"allow_dns":            allowDNS,
+					"dns_servers":          dnsServers,
 					"allowed_destinations": []string{},
 					"whitelist":            networkRules,
 					"blacklist":            []map[string]any{},
