@@ -91,6 +91,13 @@ func (m *Manager) SetupNetworkViaBastion(ctx context.Context, subnet *string, ba
 	// jsonmsg.Info(fmt.Sprintf("Setting up network via bastion pool: %s", m.networkName))
 	jsonmsg.Info("Setting up Holopod networking")
 
+	if m.networkName == "" || m.networkName == "bridge" {
+		m.networkName = "bridge"
+		m.networkViaBastion = false
+		jsonmsg.Info("Using default Docker bridge network")
+		return nil
+	}
+
 	leaseDuration := uint32(7200)
 	result, err := bastionClient.AcquireNetwork(subnet, &leaseDuration)
 	if err != nil {
