@@ -105,14 +105,19 @@ func ApplyRules(ctx context.Context, chainName string, policy *pb.NetworkPolicy)
 
 	// Apply metadata and security blocking rules for IPv4
 	if policy.BlockMetadata {
-		ipv4Rules := [][]string{
+		ipv4Rules := [][]string{}
+		// Allow Docker embedded DNS (127.0.0.11) when DNS is enabled.
+		if policy.AllowDns {
+			ipv4Rules = append(ipv4Rules, []string{"-A", chainName, "-d", "127.0.0.11/32", "-p", "udp", "--dport", "53", "-j", "ACCEPT"})
+		}
+		ipv4Rules = append(ipv4Rules, [][]string{
 			{"-A", chainName, "-d", "169.254.169.254", "-j", "DROP"},         // AWS/GCP/Azure metadata
 			{"-A", chainName, "-d", "168.63.129.16", "-j", "DROP"},           // Azure metadata
 			{"-A", chainName, "-d", "100.100.100.200", "-j", "DROP"},         // Alibaba metadata
 			{"-A", chainName, "-d", "169.254.0.0/16", "-j", "DROP"},          // Link-local
 			{"-A", chainName, "-d", "127.0.0.0/8", "-j", "DROP"},             // Localhost
 			{"-A", chainName, "-p", "udp", "--dport", "67:68", "-j", "DROP"}, // DHCP
-		}
+		}...)
 		for _, rule := range ipv4Rules {
 			if err := runIPTables(ctx, rule...); err != nil {
 				return rulesApplied, err
