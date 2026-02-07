@@ -98,19 +98,9 @@ func (m *Manager) SetupNetworkViaBastion(ctx context.Context, subnet *string, ba
 		return nil
 	}
 
-	leaseDuration := uint32(7200)
-	result, err := bastionClient.AcquireNetwork(subnet, &leaseDuration)
-	if err != nil {
-		return err
-	}
-
-	m.networkName = result.NetworkName
-	m.networkViaBastion = true
-
-	// jsonmsg.Info(fmt.Sprintf("Network acquired from bastion pool: %s (reused: %v)",
-	// 	m.networkName, result.Reused))
-	jsonmsg.Info(fmt.Sprintf("Network acquired: %s", m.networkName))
-
+	jsonmsg.Warning(fmt.Sprintf("Network '%s' is not supported; forcing default Docker bridge network", m.networkName))
+	m.networkName = "bridge"
+	m.networkViaBastion = false
 	return nil
 }
 

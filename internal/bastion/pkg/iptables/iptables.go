@@ -3,6 +3,7 @@ package iptables
 import (
 	"bytes"
 	"context"
+	"encoding/json"
 	"fmt"
 	"net"
 	"os/exec"
@@ -102,6 +103,19 @@ func ApplyRules(ctx context.Context, chainName string, policy *pb.NetworkPolicy)
 	}
 
 	rulesApplied := 0
+
+	// Always block cross-container communication on the default Docker bridge subnet(s).
+	// This enforces isolation even when user policy would otherwise allow it.
+	for _, subnet := range dockerBridgeSubnets(ctx) {
+		version, err := detectIPVersion(subnet)
+		if err != nil {
+			continue
+		}
+		if err := runIPTablesForVersion(ctx, version, "-A", chainName, "-d", subnet, "-j", "DROP"); err != nil {
+			return rulesApplied, err
+		}
+		rulesApplied++
+	}
 
 	// Apply metadata and security blocking rules for IPv4
 	if policy.BlockMetadata {
@@ -336,4 +350,39 @@ func runIPTablesForVersion(ctx context.Context, version ipVersion, args ...strin
 		return runIP6Tables(ctx, args...)
 	}
 	return runIPTables(ctx, args...)
+}
+
+type dockerIPAMConfig struct {
+	Subnet string `json:"Subnet"`
+}
+
+func dockerBridgeSubnets(ctx context.Context) []string {
+	defaultSubnets := []string{"172.17.0.0/16"}
+
+	cmd := exec.CommandContext(ctx, "docker", "network", "inspect", "bridge", "--format", "{{json .IPAM.Config}}")
+	output, err := cmd.CombinedOutput()
+	if err != nil {
+		return defaultSubnets
+	}
+
+	raw := strings.TrimSpace(string(output))
+	if raw == "" || raw == "null" {
+		return defaultSubnets
+	}
+
+	var configs []dockerIPAMConfig
+	if err := json.Unmarshal([]byte(raw), &configs); err != nil {
+		return defaultSubnets
+	}
+
+	subnets := make([]string, 0, len(configs))
+	for _, cfg := range configs {
+		if cfg.Subnet != "" {
+			subnets = append(subnets, cfg.Subnet)
+		}
+	}
+	if len(subnets) == 0 {
+		return defaultSubnets
+	}
+	return subnets
 }
