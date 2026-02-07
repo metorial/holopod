@@ -11,6 +11,8 @@ import (
 	"github.com/metorial/fleet/holopod/services/container-manager/pkg/service"
 	pb "github.com/metorial/fleet/holopod/services/container-manager/proto"
 	"google.golang.org/grpc"
+	"google.golang.org/grpc/health"
+	"google.golang.org/grpc/health/grpc_health_v1"
 )
 
 var version = "dev"
@@ -36,6 +38,9 @@ func main() {
 	}
 
 	grpcServer := grpc.NewServer()
+	healthServer := health.NewServer()
+	healthServer.SetServingStatus("", grpc_health_v1.HealthCheckResponse_SERVING)
+	grpc_health_v1.RegisterHealthServer(grpcServer, healthServer)
 	svc := service.New(mgr)
 	pb.RegisterContainerManagerServer(grpcServer, svc)
 

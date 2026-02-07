@@ -9,6 +9,8 @@ import (
 	"syscall"
 
 	"google.golang.org/grpc"
+	"google.golang.org/grpc/health"
+	"google.golang.org/grpc/health/grpc_health_v1"
 
 	"github.com/metorial/fleet/holopod/internal/bastion/pkg/iptables"
 	"github.com/metorial/fleet/holopod/internal/bastion/pkg/networkpool"
@@ -75,6 +77,9 @@ func main() {
 	}
 
 	grpcServer := grpc.NewServer()
+	healthServer := health.NewServer()
+	healthServer.SetServingStatus("", grpc_health_v1.HealthCheckResponse_SERVING)
+	grpc_health_v1.RegisterHealthServer(grpcServer, healthServer)
 	bastionService := service.New(version, pool, logger)
 	pb.RegisterBastionServiceServer(grpcServer, bastionService)
 
