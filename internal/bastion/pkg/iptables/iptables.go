@@ -108,7 +108,9 @@ func ApplyRules(ctx context.Context, chainName string, policy *pb.NetworkPolicy)
 		ipv4Rules := [][]string{}
 		// Allow Docker embedded DNS (127.0.0.11) when DNS is enabled.
 		if policy.AllowDns {
-			ipv4Rules = append(ipv4Rules, []string{"-A", chainName, "-d", "127.0.0.11/32", "-p", "udp", "--dport", "53", "-j", "ACCEPT"})
+			for _, proto := range []string{"udp", "tcp"} {
+				ipv4Rules = append(ipv4Rules, []string{"-A", chainName, "-d", "127.0.0.11/32", "-p", proto, "--dport", "53", "-j", "ACCEPT"})
+			}
 		}
 		ipv4Rules = append(ipv4Rules, [][]string{
 			{"-A", chainName, "-d", "169.254.169.254", "-j", "DROP"},         // AWS/GCP/Azure metadata
@@ -141,16 +143,18 @@ func ApplyRules(ctx context.Context, chainName string, policy *pb.NetworkPolicy)
 
 	// Apply DNS rules for both IPv4 and IPv6
 	if policy.AllowDns {
-		// Allow DNS queries on UDP port 53 for both IPv4 and IPv6
-		if err := runIPTables(ctx, "-A", chainName, "-p", "udp", "--dport", "53", "-j", "ACCEPT"); err != nil {
-			return rulesApplied, err
-		}
-		rulesApplied++
+		// Allow DNS queries on UDP/TCP port 53 for both IPv4 and IPv6
+		for _, proto := range []string{"udp", "tcp"} {
+			if err := runIPTables(ctx, "-A", chainName, "-p", proto, "--dport", "53", "-j", "ACCEPT"); err != nil {
+				return rulesApplied, err
+			}
+			rulesApplied++
 
-		if err := runIP6Tables(ctx, "-A", chainName, "-p", "udp", "--dport", "53", "-j", "ACCEPT"); err != nil {
-			return rulesApplied, err
+			if err := runIP6Tables(ctx, "-A", chainName, "-p", proto, "--dport", "53", "-j", "ACCEPT"); err != nil {
+				return rulesApplied, err
+			}
+			rulesApplied++
 		}
-		rulesApplied++
 
 		// Allow specific DNS servers if configured
 		for _, dns := range policy.DnsServers {
@@ -164,10 +168,12 @@ func ApplyRules(ctx context.Context, chainName string, policy *pb.NetworkPolicy)
 				return rulesApplied, err
 			}
 
-			if err := runIPTablesForVersion(ctx, version, "-A", chainName, "-d", dns, "-p", "udp", "--dport", "53", "-j", "ACCEPT"); err != nil {
-				return rulesApplied, err
+			for _, proto := range []string{"udp", "tcp"} {
+				if err := runIPTablesForVersion(ctx, version, "-A", chainName, "-d", dns, "-p", proto, "--dport", "53", "-j", "ACCEPT"); err != nil {
+					return rulesApplied, err
+				}
+				rulesApplied++
 			}
-			rulesApplied++
 		}
 	}
 
