@@ -1,0 +1,70 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - "v*"
+
+permissions:
+  contents: write
+
+jobs:
+  build-release:
+    name: Build and Publish
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: linux
+            arch: amd64
+          - os: linux
+            arch: arm64
+    env:
+      CGO_ENABLED: 0
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+          cache: true
+
+      - name: Build binaries
+        run: |
+          set -euo pipefail
+          version="${GITHUB_REF_NAME}"
+          dist_dir="dist/holopod_${version}_${{ matrix.os }}_${{ matrix.arch }}"
+          mkdir -p "${dist_dir}"
+
+          GOOS=${{ matrix.os }} GOARCH=${{ matrix.arch }} \
+            go build -trimpath -ldflags "-s -w -X main.version=${version}" \
+            -o "${dist_dir}/bastion" ./internal/bastion/cmd/bastion
+
+          GOOS=${{ matrix.os }} GOARCH=${{ matrix.arch }} \
+            go build -trimpath -ldflags "-s -w -X main.version=${version}" \
+            -o "${dist_dir}/isolation-runner" ./internal/isolation-runner/cmd/isolation-runner
+
+          GOOS=${{ matrix.os }} GOARCH=${{ matrix.arch }} \
+            go build -trimpath -ldflags "-s -w -X main.version=${version}" \
+            -o "${dist_dir}/container-manager" ./services/container-manager/cmd/container-manager
+
+          GOOS=${{ matrix.os }} GOARCH=${{ matrix.arch }} \
+            go build -trimpath -ldflags "-s -w -X main.version=${version}" \
+            -o "${dist_dir}/cleanup-orphans" ./internal/isolation-runner/cmd/cleanup-orphans
+
+          tar -C "${dist_dir}" -czf "dist/holopod_${version}_${{ matrix.os }}_${{ matrix.arch }}.tar.gz" \
+            bastion isolation-runner container-manager cleanup-orphans
+
+          sha256sum "dist/holopod_${version}_${{ matrix.os }}_${{ matrix.arch }}.tar.gz" \
+            > "dist/holopod_${version}_${{ matrix.os }}_${{ matrix.arch }}.sha256"
+
+      - name: Publish release assets
+        uses: softprops/action-gh-release@v2
+        with:
+          files: |
+            dist/holopod_${{ github.ref_name }}_${{ matrix.os }}_${{ matrix.arch }}.tar.gz
+            dist/holopod_${{ github.ref_name }}_${{ matrix.os }}_${{ matrix.arch }}.sha256
+          fail_on_unmatched_files: true

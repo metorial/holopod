@@ -15,7 +15,7 @@ import (
 	"github.com/metorial/fleet/holopod/internal/isolation-runner/pkg/lifecycle"
 )
 
-const version = "1.2.0"
+var version = "dev"
 
 func main() {
 	// CRITICAL: Ensure cleanup always runs, even on panic

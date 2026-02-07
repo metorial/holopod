@@ -13,7 +13,7 @@ import (
 	"google.golang.org/grpc"
 )
 
-const version = "1.0.0"
+var version = "dev"
 
 func main() {
 	listenAddr := os.Getenv("LISTEN_ADDRESS")

@@ -16,7 +16,7 @@ import (
 	pb "github.com/metorial/fleet/holopod/internal/bastion/proto"
 )
 
-const version = "1.0.0"
+var version = "dev"
 
 func main() {
 	logger := slog.New(slog.NewJSONHandler(os.Stdout, &slog.HandlerOptions{

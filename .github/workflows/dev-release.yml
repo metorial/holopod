@@ -1,0 +1,74 @@
+name: Dev Release
+
+on:
+  push:
+    branches:
+      - main
+
+permissions:
+  contents: write
+
+jobs:
+  build-dev:
+    name: Build and Publish Dev
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: linux
+            arch: amd64
+          - os: linux
+            arch: arm64
+    env:
+      CGO_ENABLED: 0
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+          cache: true
+
+      - name: Build binaries
+        run: |
+          set -euo pipefail
+          version="dev-${GITHUB_SHA::7}"
+          dist_dir="dist/holopod_dev_${{ matrix.os }}_${{ matrix.arch }}"
+          mkdir -p "${dist_dir}"
+
+          GOOS=${{ matrix.os }} GOARCH=${{ matrix.arch }} \
+            go build -trimpath -ldflags "-s -w -X main.version=${version}" \
+            -o "${dist_dir}/bastion" ./internal/bastion/cmd/bastion
+
+          GOOS=${{ matrix.os }} GOARCH=${{ matrix.arch }} \
+            go build -trimpath -ldflags "-s -w -X main.version=${version}" \
+            -o "${dist_dir}/isolation-runner" ./internal/isolation-runner/cmd/isolation-runner
+
+          GOOS=${{ matrix.os }} GOARCH=${{ matrix.arch }} \
+            go build -trimpath -ldflags "-s -w -X main.version=${version}" \
+            -o "${dist_dir}/container-manager" ./services/container-manager/cmd/container-manager
+
+          GOOS=${{ matrix.os }} GOARCH=${{ matrix.arch }} \
+            go build -trimpath -ldflags "-s -w -X main.version=${version}" \
+            -o "${dist_dir}/cleanup-orphans" ./internal/isolation-runner/cmd/cleanup-orphans
+
+          tar -C "${dist_dir}" -czf "dist/holopod_dev_${{ matrix.os }}_${{ matrix.arch }}.tar.gz" \
+            bastion isolation-runner container-manager cleanup-orphans
+
+          sha256sum "dist/holopod_dev_${{ matrix.os }}_${{ matrix.arch }}.tar.gz" \
+            > "dist/holopod_dev_${{ matrix.os }}_${{ matrix.arch }}.sha256"
+
+      - name: Publish dev release assets
+        uses: ncipollo/release-action@v1
+        with:
+          tag: dev
+          name: dev
+          prerelease: true
+          allowUpdates: true
+          replacesArtifacts: true
+          artifacts: |
+            dist/holopod_dev_${{ matrix.os }}_${{ matrix.arch }}.tar.gz
+            dist/holopod_dev_${{ matrix.os }}_${{ matrix.arch }}.sha256
